@@ -242,15 +242,8 @@ VPS 剩余价值计算器是一个强大的Web应用，专为需要精确计算V
 
 ---
 
-## 📄 许可证
-
-MIT License - 详见 [LICENSE](LICENSE) 文件
-
-
 <div align="center">
 
 **[⬆ 返回顶部](#vps-剩余价值计算器)**
-
-Made with ❤️ for VPS traders worldwide
 
 </div>
