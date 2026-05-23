@@ -1,0 +1,1227 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VPS 剩余价值计算器</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;900&display=swap');
+
+:root {
+  color-scheme: light;
+  --bg:#f0f5fb; --card:#ffffff;
+  --accent:#3b5bdb; --accent2:#0ea5e9;
+  --success:#0ea86a; --warn:#e9920a;
+  --panel:#0c1a2e; --panel2:#13243f; --border:#d8e2f0;
+  --txt:#18253e; --muted:#7e91a8; --soft:#526380;
+  --input:#f5f8fd; --surface:#ffffff; --surface2:#eaf0fa;
+  --shadow:0 16px 48px rgba(14,24,48,.07);
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg:#070e1c; --card:#0c1728;
+  --accent:#7b97f4; --accent2:#38bdf8;
+  --success:#34d399; --warn:#fbbf24;
+  --panel:#05101f; --panel2:#0c1c34; --border:#182d4e;
+  --txt:#d8e6f6; --muted:#6e83a0; --soft:#92aac6;
+  --input:#0a1525; --surface:#0c1728; --surface2:#0f1f38;
+  --shadow:0 18px 60px rgba(0,0,0,.45);
+}
+
+body { background:var(--bg); color:var(--txt); font-family:'DM Sans','PingFang SC',sans-serif; min-height:100vh; transition:background .25s,color .25s; }
+*,:before,:after { box-sizing:border-box; }
+
+/* Spinners off */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+input[type=number] { -moz-appearance:textfield; }
+
+/* Date inputs */
+input[type=date],input[type=datetime-local] {
+  padding-left:12px !important; padding-right:4px !important;
+  letter-spacing:-.3px !important;
+}
+input::-webkit-calendar-picker-indicator { margin:0 !important; padding:0 !important; width:16px !important; cursor:pointer; opacity:.5; }
+
+/* Labels */
+.lbl { display:block; font-size:10px; font-weight:900; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin-bottom:6px; }
+
+/* ── Universal input height: 48px, enforced at all breakpoints ── */
+:root { --ih: 48px; }
+
+.fi, .fi-xl, .csel-btn, .rate-row {
+  box-sizing:border-box;
+  height:var(--ih) !important;
+  min-height:var(--ih) !important;
+  max-height:var(--ih) !important;
+  border-radius:12px;
+  border:1.5px solid var(--border);
+  background:var(--input);
+  transition:border-color .15s, background .15s;
+  -webkit-appearance:none; -moz-appearance:none; appearance:none;
+}
+/* Base fi (all inputs, selects) */
+.fi {
+  display:block; width:100%;
+  padding:0 14px; line-height:var(--ih);
+  font-size:14px; font-weight:600; color:var(--txt);
+  outline:none;
+}
+/* fi-xl: same height, bigger font for amount fields */
+.fi-xl {
+  padding:0 16px !important; line-height:var(--ih) !important;
+  font-size:18px !important; font-weight:800 !important;
+  border-width:2px !important;
+}
+.fi:focus, .fi-xl:focus { border-color:var(--accent); background:var(--surface); }
+
+/* iOS/Safari: force height on date + select */
+input.fi, input.fi-xl {
+  padding-top:0 !important; padding-bottom:0 !important;
+  line-height:var(--ih) !important;
+}
+select.fi {
+  padding-top:0 !important; padding-bottom:0 !important;
+  line-height:var(--ih) !important; cursor:pointer;
+}
+input[type=date].fi, input[type=datetime-local].fi {
+  padding-top:0 !important; padding-bottom:0 !important;
+  line-height:var(--ih) !important;
+  -webkit-padding-start:12px;
+}
+/* Prevent iOS zoom on focus */
+@media (max-width:768px) {
+  .fi, .fi-xl, .rate-row input { font-size:16px !important; }
+}
+
+/* Custom rate row — same height container, internal layout */
+.rate-row {
+  display:grid; grid-template-columns:auto 1fr auto;
+  align-items:center; gap:8px;
+  padding:0 14px; width:100%;
+}
+.rate-row input {
+  background:transparent; border:none; outline:none;
+  font-size:15px; font-weight:700; color:var(--txt);
+  width:100%; text-align:center;
+  height:100%; line-height:var(--ih);
+  padding:0 !important;
+}
+.rate-row span { font-size:11px; font-weight:800; color:var(--muted); white-space:nowrap; }
+
+/* Cycle / seg buttons */
+.cyc-btn,.seg-btn {
+  height:38px; width:100%; border:1.5px solid var(--border);
+  background:var(--surface); color:var(--muted); font-weight:700; font-size:11px;
+  border-radius:10px; cursor:pointer; transition:all .15s;
+}
+.cyc-btn.active,.seg-btn.on { background:var(--accent); border-color:var(--accent); color:#fff; box-shadow:0 4px 14px rgba(99,102,241,.3); }
+
+/* Mode tab */
+.mode-btn { background:transparent; color:var(--muted); font-weight:700; font-size:11px; border-radius:9px; padding:6px 0; cursor:pointer; border:none; transition:all .15s; width:100%; }
+.mode-btn.active { background:var(--surface); color:var(--txt); box-shadow:0 1px 5px rgba(0,0,0,.1); }
+
+/* Toggle switch */
+.tog { position:relative; width:36px; height:20px; border-radius:99px; background:#d1d5db; transition:background .2s; flex-shrink:0; }
+.tog input { position:absolute; opacity:0; width:0; height:0; }
+.tog-knob { position:absolute; top:3px; left:3px; width:14px; height:14px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.2); transition:transform .2s; }
+.tog input:checked ~ .tog-knob { transform:translateX(16px); }
+.tog.on { background:var(--accent); }
+
+/* Currency dropdown */
+.csel-wrap { position:relative; }
+.csel-btn { display:flex; align-items:center; justify-content:space-between; gap:6px; padding:0 14px; font-size:14px; font-weight:700; color:var(--txt); cursor:pointer; width:100%; }
+.csel-btn:hover { border-color:var(--accent); }
+.csel-dd { position:absolute; z-index:999; top:calc(100% + 4px); left:0; background:var(--surface); border:1.5px solid var(--border); border-radius:14px; box-shadow:0 8px 32px rgba(0,0,0,.14); min-width:140px; padding:4px; display:none; }
+.csel-dd.open { display:block; }
+.csel-opt { padding:8px 12px; font-size:13px; font-weight:600; border-radius:10px; cursor:pointer; }
+.csel-opt:hover { background:var(--surface2); color:var(--accent); }
+
+/* Rate pill */
+.rate-pill { display:flex; align-items:center; gap:4px; background:var(--input); border:1.5px solid var(--border); border-radius:10px; padding:5px 9px; cursor:default; transition:all .15s; }
+.rate-pill:hover { background:var(--surface2); border-color:var(--accent); }
+
+/* Card divider */
+.cdiv { border-top:1.5px solid var(--border); margin:22px 0; }
+
+/* ── finalCostBox state classes ── */
+.cost-normal { background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1); border-radius:12px; padding:16px; transition:all .3s; }
+.cost-extra  { background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.2); border-radius:12px; padding:16px; transition:all .3s; }
+
+/* ── Right panel metric cards ── */
+.rp-metric { display:flex; flex-direction:column; gap:5px; padding:11px 13px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.07); border-radius:12px; }
+.rp-metric-em { background:rgba(255,255,255,.07); border-color:rgba(255,255,255,.14); }
+.rp-metric-lbl { font-size:9px; font-weight:900; letter-spacing:.08em; text-transform:uppercase; color:rgba(255,255,255,.3); }
+.rp-metric-val { font-size:14px; font-weight:800; color:#cfe0f4; line-height:1; }
+/* Optional fee rows (push / middleman) */
+.rp-fee-row { display:flex; justify-content:space-between; align-items:center; padding:8px 16px; border-bottom:1px solid rgba(255,255,255,.06); }
+.rp-fee-lbl { font-size:9px; font-weight:800; letter-spacing:.07em; text-transform:uppercase; color:rgba(255,255,255,.3); }
+.rp-fee-val { font-size:12px; font-weight:800; }
+
+/* Progress bar */
+.prog { background:linear-gradient(90deg,var(--accent),var(--accent2)); border-radius:99px; height:100%; transition:width .8s cubic-bezier(.4,0,.2,1); }
+
+/* Toast */
+@keyframes tin { from{opacity:0;transform:translateX(-50%) translateY(8px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
+.t-show { animation:tin .2s ease forwards; display:flex !important; }
+
+/* Theme polish */
+.bg-white { background-color:var(--card) !important; }
+.bg-gray-50 { background-color:var(--input) !important; }
+.bg-gray-100 { background-color:var(--surface2) !important; }
+.border-gray-100,.border-gray-200 { border-color:var(--border) !important; }
+.text-gray-800 { color:var(--txt) !important; }
+.text-gray-400,.text-gray-300 { color:var(--muted) !important; }
+.shadow-sm { box-shadow:var(--shadow) !important; }
+
+/* ── Unified header stat pills ── */
+.stat-pill {
+  height:30px; border:1px solid var(--border); border-radius:999px;
+  display:inline-flex; align-items:center; gap:5px; padding:0 11px;
+  background:var(--surface2); color:var(--soft); font-size:11px; font-weight:700; white-space:nowrap;
+}
+.stat-pill i { font-size:11px; color:var(--accent); }
+.stat-count { color:var(--txt); font-weight:900; }
+.stat-btn { cursor:pointer; border:1px solid var(--border); background:var(--surface2); transition:background .15s,border-color .15s,color .15s; }
+.stat-btn:hover { border-color:var(--accent); background:var(--input); color:var(--accent); }
+.stat-btn:hover i { color:var(--accent); }
+/* Moon/Sun icon visibility */
+.stat-pill .fa-moon { display:none; }
+:root[data-theme="dark"] .stat-pill .fa-sun { display:none; }
+:root[data-theme="dark"] .stat-pill .fa-moon { display:inline-block; }
+
+/* ── Color picker popup ── */
+.color-picker-wrap { position:relative; }
+.color-picker-popup {
+  position:absolute; top:calc(100% + 6px); right:0; z-index:999;
+  background:var(--surface); border:1.5px solid var(--border); border-radius:14px;
+  box-shadow:0 8px 32px rgba(0,0,0,.18); padding:10px;
+  display:none; flex-direction:column; gap:8px; min-width:168px;
+}
+.color-picker-popup.open { display:flex; }
+.cp-label { font-size:9px; font-weight:800; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); }
+.cp-input-wrap { position:relative; width:100%; height:36px; border-radius:9px; overflow:hidden; border:1.5px solid var(--border); cursor:pointer; }
+.cp-input-wrap input[type=color] { position:absolute; inset:-4px; width:calc(100% + 8px); height:calc(100% + 8px); border:none; padding:0; cursor:pointer; }
+.cp-presets { display:grid; grid-template-columns:repeat(6,1fr); gap:5px; }
+.color-swatch {
+  width:100%; aspect-ratio:1; border-radius:7px; cursor:pointer;
+  border:2px solid transparent; transition:transform .15s,border-color .15s;
+}
+.color-swatch:hover { transform:scale(1.12); }
+.color-swatch.active { border-color:var(--txt); }
+
+/* Snapshot background */
+#snapTarget { background:var(--panel); }
+</style>
+</head>
+<body class="p-4 md:p-8">
+
+<!-- Toast -->
+<div id="toast" class="fixed top-5 left-1/2 -translate-x-1/2 z-50 hidden pointer-events-none bg-gray-900 text-white text-xs font-bold px-5 py-2.5 rounded-full shadow-2xl items-center gap-2">
+  <i class="fas fa-check-circle text-emerald-400"></i><span id="toastMsg"></span>
+</div>
+
+<div class="max-w-5xl mx-auto">
+
+  <!-- Header -->
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-3">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl flex items-center justify-center text-white" style="background:linear-gradient(135deg,var(--accent),var(--accent2))">
+        <i class="fas fa-server"></i>
+      </div>
+      <div>
+        <h1 class="text-[15px] font-black text-gray-800 leading-tight">VPS 剩余价值计算器</h1>
+      </div>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <div class="stat-pill">
+        <i class="fas fa-calendar-day"></i>
+        <span>今日计算</span>
+        <span id="todayCount" class="stat-count">--</span>
+      </div>
+      <div class="stat-pill">
+        <i class="fas fa-fire"></i>
+        <span>累计计算</span>
+        <span id="totalCount" class="stat-count">--</span>
+      </div>
+      <button id="themeToggle" class="stat-pill stat-btn" type="button" title="切换日夜主题">
+        <i class="fas fa-sun"></i><i class="fas fa-moon"></i>
+        <span id="themeLabel">日间</span>
+      </button>
+      <div class="color-picker-wrap">
+        <button id="colorToggle" class="stat-pill stat-btn" type="button" title="切换主题色">
+          <i class="fas fa-palette"></i>
+          <span>主题色</span>
+        </button>
+        <div id="colorPickerPopup" class="color-picker-popup"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+
+    <!-- ===== LEFT ===== -->
+    <div class="lg:col-span-7 space-y-4">
+
+      <!-- Main card (with rate section merged in) -->
+      <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+
+        <!-- 实时汇率（合并）-->
+        <div class="flex items-center gap-2 mb-2">
+          <i class="fas fa-chart-line text-[10px]" style="color:var(--accent)"></i>
+          <span class="lbl mb-0" style="color:var(--accent)">实时汇率</span>
+          <span class="text-[9px] text-gray-300 font-bold">对 CNY</span>
+          <div class="ml-auto flex items-center gap-2">
+            <span id="rateStatus" class="hidden text-[9px] px-2 py-0.5 rounded-full font-bold border"></span>
+            <span id="apiSourceLabel" class="text-[9px] text-gray-300 font-bold">LOADING...</span>
+          </div>
+        </div>
+        <div id="rateGrid" class="flex flex-wrap gap-1.5"></div>
+
+        <div class="cdiv"></div>
+
+        <!-- ① 续费信息 -->
+        <p class="lbl"><i class="fas fa-receipt mr-1.5 text-indigo-300"></i>① 续费信息</p>
+
+        <div class="grid grid-cols-1 sm:grid-cols-5 gap-3 mb-4">
+          <div class="sm:col-span-3">
+            <div class="flex items-center h-7 mb-1.5">
+              <span class="lbl mb-0">续费金额</span>
+            </div>
+            <input type="number" id="renewalAmount" class="fi fi-xl" placeholder="请输入金额" min="0">
+          </div>
+          <div class="sm:col-span-2">
+            <div class="flex items-center justify-between h-7 mb-1.5">
+              <span class="lbl mb-0">计价币种</span>
+              <label id="customRateToggleBox" class="flex items-center gap-1.5 cursor-pointer">
+                <div class="tog" id="customRateTrack">
+                  <input type="checkbox" id="useCustomRate">
+                  <div class="tog-knob"></div>
+                </div>
+                <span class="text-[10px] font-bold text-gray-400">自定义汇率</span>
+              </label>
+            </div>
+            <select id="currencySelector" class="fi cursor-pointer">
+              <option value="USD">USD · 美元</option>
+              <option value="CNY">CNY · 人民币</option>
+              <option value="EUR">EUR · 欧元</option>
+              <option value="GBP">GBP · 英镑</option>
+              <option value="JPY">JPY · 日元</option>
+              <option value="HKD">HKD · 港币</option>
+              <option value="TWD">TWD · 新台币</option>
+            </select>
+            <div id="customRateWrapper" class="hidden mt-2">
+              <span class="lbl">自定义汇率 <span id="customRateLabel">USD</span> → CNY</span>
+              <div class="rate-row">
+                <span>1 <span id="customRateCurr">USD</span></span>
+                <input type="number" id="customRateInput" placeholder="填入汇率" min="0">
+                <span>CNY</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <span class="lbl">付款周期</span>
+        <div class="grid grid-cols-6 gap-2">
+          <button class="cyc-btn" data-cycle="30">月付</button>
+          <button class="cyc-btn" data-cycle="91">季付</button>
+          <button class="cyc-btn" data-cycle="182">半年</button>
+          <button class="cyc-btn active" data-cycle="365">年付</button>
+          <button class="cyc-btn" data-cycle="730">两年</button>
+          <button class="cyc-btn" data-cycle="1095">三年</button>
+        </div>
+
+        <div class="cdiv"></div>
+
+        <!-- ② 时间信息 -->
+        <div class="flex items-center justify-between mb-3">
+          <p class="lbl mb-0"><i class="fas fa-calendar mr-1.5 text-indigo-300"></i>② 时间信息</p>
+          <button id="toggleTimePrecision" class="text-[10px] text-gray-400 font-bold hover:text-indigo-500 transition-colors">
+            <i class="fas fa-clock mr-1"></i>精确到时分
+          </button>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><span class="lbl">交易日期</span><input type="date" id="tradeDate" class="fi"></div>
+          <div><span class="lbl">到期日期</span><input type="date" id="expiryDate" class="fi"></div>
+        </div>
+
+        <div class="cdiv"></div>
+
+        <!-- ③ 交易费用 -->
+        <p class="lbl"><i class="fas fa-coins mr-1.5 text-indigo-300"></i>③ 交易费用</p>
+
+        <!-- 卖家溢价 -->
+        <div class="mb-5">
+          <span class="lbl">卖家溢价 (CNY)</span>
+          <input type="number" id="premiumInput" class="fi fi-xl" placeholder="填入溢价金额（可为负）">
+          <p id="bindHint" class="mt-2 text-[10px] text-gray-400 font-bold">
+            <i class="fas fa-info-circle mr-1 text-indigo-300"></i>实付 = 剩余价值 + 溢价 + 卖家承担的 Push 费
+          </p>
+        </div>
+
+        <div class="cdiv"></div>
+
+        <!-- Push 费 -->
+        <div class="mb-5">
+          <div class="flex items-center justify-between mb-3">
+            <p class="lbl mb-0"><i class="fas fa-bolt mr-1.5 text-indigo-300"></i>Push 费</p>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <span class="text-[11px] font-bold text-gray-400">开启 Push</span>
+              <div class="tog" id="pushTrack">
+                <input type="checkbox" id="usePush">
+                <div class="tog-knob"></div>
+              </div>
+            </label>
+          </div>
+          <p id="pushOffHint" class="text-[10px] font-bold py-1" style="color:var(--muted)">
+            <i class="fas fa-info-circle mr-1"></i>开启后填写金额及承担方，自动计入总支出
+          </p>
+          <div id="pushSettings" class="hidden space-y-3">
+            <div>
+              <span class="lbl">承担方</span>
+              <div class="grid grid-cols-2 gap-2">
+                <button class="seg-btn on" data-push-payer="buyer">买家承担</button>
+                <button class="seg-btn" data-push-payer="split">AA 平摊</button>
+              </div>
+              <select id="pushPayer" class="hidden"><option value="buyer">买家</option><option value="split">AA</option></select>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <span class="lbl">金额</span>
+                <input type="number" id="pushFee" class="fi" placeholder="0" min="0">
+              </div>
+              <div>
+                <span class="lbl">货币</span>
+                <div class="csel-wrap">
+                  <button class="csel-btn" id="pushCurrBtn">
+                    <span id="pushCurrLabel">USD</span>
+                    <i class="fas fa-chevron-down text-[9px] text-gray-400"></i>
+                  </button>
+                  <div class="csel-dd" id="pushCurrDd"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="cdiv"></div>
+
+        <!-- 中介担保 -->
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <p class="lbl mb-0"><i class="fas fa-shield-alt mr-1.5 text-indigo-300"></i>中介担保</p>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <span class="text-[11px] font-bold text-gray-400">开启担保</span>
+              <div class="tog" id="middlemanTrack">
+                <input type="checkbox" id="useMiddleman">
+                <div class="tog-knob"></div>
+              </div>
+            </label>
+          </div>
+          <p id="middlemanOffHint" class="text-[10px] font-bold py-1" style="color:var(--muted)">
+            <i class="fas fa-info-circle mr-1"></i>开启后可设置担保费率及承担方，自动计入买家总支出
+          </p>
+          <div id="middlemanSettings" class="hidden space-y-4">
+            <div>
+              <span class="lbl">担保费承担方</span>
+              <div class="grid grid-cols-2 gap-2">
+                <button class="seg-btn on" data-payer="buyer">买家承担</button>
+                <button class="seg-btn" data-payer="split">AA 平摊</button>
+              </div>
+              <select id="middlemanPayer" class="hidden"><option value="buyer">买家</option><option value="split">AA</option></select>
+              <p id="payerDesc" class="mt-2 text-[9px] font-bold" style="color:var(--accent);background:rgba(59,91,219,.07);border:1px solid rgba(59,91,219,.15);border-radius:8px;padding:6px 12px">
+                买家额外支付担保费，计入总支出
+              </p>
+            </div>
+            <div>
+              <div class="flex gap-1 mb-3 bg-gray-100 rounded-xl p-1">
+                <button id="modeRateBtn" class="mode-btn flex-1" onclick="setMidMode('rate')"><i class="fas fa-percent mr-1 text-[9px]"></i>按费率</button>
+                <button id="modeManualBtn" class="mode-btn flex-1" onclick="setMidMode('manual')"><i class="fas fa-pen mr-1 text-[9px]"></i>手动金额</button>
+              </div>
+              <p id="midModeHint" class="text-[10px] font-bold" style="color:var(--accent);background:rgba(59,91,219,.07);border:1px solid rgba(59,91,219,.15);border-radius:12px;padding:8px 12px"><i class="fas fa-hand-point-up mr-1"></i>请先选择上方计费方式，再计入总支出</p>
+              <div id="panelRate">
+                <span class="lbl">担保费率</span>
+                <div class="flex items-center gap-3">
+                  <input type="range" id="middlemanRate" min="1" max="20" step="0.5" value="5" class="flex-1 h-1.5 rounded-full appearance-none cursor-pointer accent-indigo-500" style="background:linear-gradient(to right,var(--accent) 25%,var(--border) 25%)">
+                  <div class="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-xl px-2.5 h-9 min-w-[58px]">
+                    <input type="number" id="middlemanRateInput" value="5" min="0.1" max="100" step="0.1" class="w-8 bg-transparent text-[13px] font-black text-gray-800 outline-none text-right">
+                    <span class="text-[10px] font-bold text-gray-400">%</span>
+                  </div>
+                </div>
+              </div>
+              <div id="panelManual" class="hidden">
+                <span class="lbl">手动担保金额</span>
+                <div class="flex items-center gap-2 fi !p-0 !h-[46px] overflow-hidden">
+                  <span class="pl-3 text-[13px] font-bold text-gray-400">¥</span>
+                  <input type="number" id="middlemanManual" min="0" placeholder="请输入担保金额" class="flex-1 h-full pr-3 bg-transparent text-[15px] font-bold text-gray-800 outline-none placeholder-gray-300">
+                </div>
+              </div>
+            </div>
+            <p id="middlemanLeftHint" class="hidden text-[10px] font-bold" style="color:var(--success);background:rgba(14,168,106,.07);border:1px solid rgba(14,168,106,.2);border-radius:12px;padding:8px 12px"></p>
+          </div>
+        </div>
+
+      </div><!-- /main card -->
+    </div><!-- /left -->
+
+    <!-- ===== RIGHT PANEL ===== -->
+    <div class="lg:col-span-5">
+      <div id="rightPanelCard" class="sticky top-6 rounded-2xl overflow-hidden shadow-2xl text-white" style="background:var(--panel);border-bottom:4px solid var(--accent)">
+        <div id="snapTarget">
+
+        <!-- Hero: VPS 剩余价值 -->
+        <div class="px-6 pt-6 pb-5 border-b border-white/10" style="background:linear-gradient(150deg,rgba(255,255,255,.05) 0%,transparent 55%)">
+          <p class="text-[9px] font-black tracking-widest uppercase mb-2" style="color:var(--accent2)">VPS 剩余价值</p>
+          <div id="resCNYBig" class="text-[40px] font-black text-white leading-none">¥ --</div>
+          <div id="premiumBox" class="hidden mt-2.5 flex items-center gap-2">
+            <span id="premiumBadge" class="text-[10px] font-black px-2 py-0.5 rounded-full border">卖家溢价</span>
+            <span id="premiumValueBig" class="text-base font-black">--</span>
+          </div>
+        </div>
+
+        <!-- 2×2 Metric grid -->
+        <div class="p-4 border-b border-white/10">
+          <div class="grid grid-cols-2 gap-2">
+            <div class="rp-metric">
+              <span class="rp-metric-lbl">折合原币</span>
+              <span id="resOrig" class="rp-metric-val">--</span>
+            </div>
+            <div class="rp-metric rp-metric-em">
+              <span class="rp-metric-lbl" style="color:var(--accent2)">实付卖家</span>
+              <span id="resActual" class="rp-metric-val" style="color:var(--accent2)">--</span>
+            </div>
+            <div class="rp-metric">
+              <span class="rp-metric-lbl">官方日均</span>
+              <span id="dayOfficial" class="rp-metric-val">--</span>
+            </div>
+            <div class="rp-metric rp-metric-em">
+              <span class="rp-metric-lbl" style="color:var(--accent2)">综合日均</span>
+              <span id="dayActual" class="rp-metric-val" style="color:var(--accent2)">--</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Optional fee rows: Push + Middleman -->
+        <div id="pushRow" class="rp-fee-row hidden">
+          <span class="rp-fee-lbl"> Push 费 </span>
+          <span id="resPush" class="rp-fee-val" style="color:var(--accent2)">--</span>
+        </div>
+        <div id="middlemanRow" class="rp-fee-row hidden">
+          <span class="rp-fee-lbl"> 中介费 </span>
+          <span id="resMiddleman" class="rp-fee-val" style="color:#fbbf24">--</span>
+        </div>
+
+        <!-- Progress bar -->
+        <div class="px-4 py-3 border-b border-white/10">
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-[9px] font-black uppercase tracking-wider" style="color:rgba(255,255,255,.3)">剩余有效期</span>
+            <div class="flex items-center gap-2">
+              <span id="progressHint" class="text-[9px] font-bold" style="color:rgba(255,255,255,.25)"></span>
+              <span id="remainingDays" class="font-black text-sm" style="color:var(--accent2)">-- 天</span>
+            </div>
+          </div>
+          <div class="h-1.5 bg-white/10 overflow-hidden" style="border-radius:6px;">
+            <div id="remainingBar" class="prog" style="width:0%"></div>
+          </div>
+        </div>
+
+        <!-- Composition bar (conditional) -->
+        <div id="valueRatioBox" class="hidden px-4 py-3 border-b border-white/10">
+          <p class="text-[9px] font-black uppercase tracking-wider mb-2" style="color:rgba(255,255,255,.3)">费用构成</p>
+          <div class="h-2 bg-white/10 overflow-hidden flex mb-2.5" style="border-radius:5px;">
+            <div id="barValue"    class="h-full transition-all duration-500" style="width:0%;background:var(--accent2)"></div>
+            <div id="barPremium" class="h-full bg-amber-400 transition-all duration-500" style="width:0%"></div>
+            <div id="barPush"    class="h-full bg-cyan-300 transition-all duration-500" style="width:0%"></div>
+            <div id="barMid"     class="h-full bg-violet-400 transition-all duration-500" style="width:0%"></div>
+          </div>
+          <div class="flex flex-wrap gap-x-3 gap-y-1">
+            <span class="flex items-center gap-1.5 text-[9px] font-bold" style="color:rgba(255,255,255,.3)"><span class="w-1.5 h-1.5 flex-shrink-0 rounded-full" style="background:var(--accent2)"></span>剩余价值</span>
+            <span id="legendPremium" class="hidden flex items-center gap-1.5 text-[9px] font-bold" style="color:rgba(251,191,36,.65)"><span class="w-1.5 h-1.5 bg-amber-400 flex-shrink-0 rounded-full"></span>溢价</span>
+            <span id="legendPush"    class="hidden flex items-center gap-1.5 text-[9px] font-bold" style="color:rgba(103,232,249,.65)"><span class="w-1.5 h-1.5 bg-cyan-300 flex-shrink-0 rounded-full"></span>Push</span>
+            <span id="legendMid"     class="hidden flex items-center gap-1.5 text-[9px] font-bold" style="color:rgba(167,139,250,.65)"><span class="w-1.5 h-1.5 bg-violet-400 flex-shrink-0 rounded-full"></span>中介</span>
+          </div>
+        </div>
+
+        <!-- Total cost -->
+        <div class="px-4 py-4">
+          <div id="finalCostBox" class="cost-normal">
+            <div class="flex justify-between items-center">
+              <div>
+                <p id="finalCostLabel" class="text-[9px] font-black uppercase tracking-wider mb-1" style="color:rgba(255,255,255,.3)">买家总支出</p>
+                <p id="extraFeeDetail" class="text-[9px] font-bold" style="color:rgba(255,255,255,.3)"></p>
+              </div>
+              <div id="finalTotalCostDisplay" class="text-2xl font-black text-white">¥ --</div>
+            </div>
+          </div>
+        </div>
+
+        </div><!-- /snapTarget -->
+
+        <!-- Action buttons -->
+        <div class="px-4 pb-5 flex gap-2">
+          <button id="copyBtn" class="flex-1 h-10 rounded-xl font-black text-sm text-white transition-all hover:opacity-90 active:scale-95 flex items-center justify-center gap-2" style="background:linear-gradient(135deg,var(--accent),var(--accent2))">
+            <i class="fas fa-copy text-[12px]"></i>复制详情
+          </button>
+          <button id="snapBtn" class="h-10 px-3 rounded-xl bg-white/10 hover:bg-white/20 text-white/50 hover:text-white transition-all flex items-center gap-1.5" title="生成图片">
+            <i class="fas fa-image text-[11px]"></i>
+            <span class="text-[11px] font-bold">截图</span>
+          </button>
+          <button id="shareBtn" class="h-10 px-3 rounded-xl bg-white/10 hover:bg-white/20 text-white/50 hover:text-white transition-all flex items-center gap-1.5" title="复制分享链接">
+            <i class="fas fa-link text-[11px]"></i>
+            <span class="text-[11px] font-bold">分享</span>
+          </button>
+          <button id="resetBtn" class="h-10 px-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400/60 hover:text-red-400 transition-all flex items-center gap-1.5" title="重置">
+            <i class="fas fa-rotate-right text-[11px]"></i>
+            <span class="text-[11px] font-bold">重置</span>
+          </button>
+        </div>
+
+      </div>
+    </div><!-- /right -->
+
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.13/dist/html-to-image.min.js"></script>
+<script>
+const API_BASE = 'https://vps-calc-24228-default-rtdb.firebaseio.com';
+let cycleDays = 365, isDateTime = false, midMode = 'none', toastTimer = null;
+const THEME_KEY = 'vps_theme';
+let rates = { USD:7.23,EUR:7.82,GBP:9.12,JPY:0.047,HKD:0.92,TWD:0.23,KRW:0.005,SGD:5.38,AUD:4.75,CAD:5.32,CNY:1 };
+
+// ── URL 参数短 key 映射（share 用短 key，restore 兼容新旧两种）──
+const KEY = {
+  ra:'renewalAmount', cs:'currencySelector', td:'tradeDate', ed:'expiryDate',
+  pi:'premiumInput',  pf:'pushFee',          pp:'pushPayer', mp:'middlemanPayer',
+  cd:'cycleDays',     pc:'pushCurrency',      dt:'isDateTime',
+  ucr:'useCustomRate',cri:'customRateInput',  up:'usePush',   um:'useMiddleman'
+};
+const RKEY = Object.fromEntries(Object.entries(KEY).map(([s,l])=>[l,s]));
+const pg = (p, long) => p.get(RKEY[long]) ?? p.get(long);
+
+// ── Color scheme (free picker) ─────────────────────────────
+const COLOR_KEY = 'vps_color';
+const COLOR_PRESETS = ['#3b5bdb','#7c3aed','#e11d48','#0d9488','#ea580c','#059669'];
+
+function hexToHsl(hex) {
+  let r=parseInt(hex.slice(1,3),16)/255, g=parseInt(hex.slice(3,5),16)/255, b=parseInt(hex.slice(5,7),16)/255;
+  const max=Math.max(r,g,b), min=Math.min(r,g,b); let h,s,l=(max+min)/2;
+  if(max===min){h=s=0;}else{
+    const d=max-min; s=l>.5?d/(2-max-min):d/(max+min);
+    switch(max){case r:h=((g-b)/d+(g<b?6:0))/6;break;case g:h=((b-r)/d+2)/6;break;case b:h=((r-g)/d+4)/6;break;}
+  }
+  return [h*360,s*100,l*100];
+}
+function hslToHex(h,s,l) {
+  s/=100;l/=100; const a=s*Math.min(l,1-l);
+  const f=n=>{const k=(n+h/30)%12;const c=l-a*Math.max(Math.min(k-3,9-k,1),-1);return Math.round(255*c).toString(16).padStart(2,'0');};
+  return `#${f(0)}${f(8)}${f(4)}`;
+}
+function getAccent2(hex) {
+  const [h,s,l]=hexToHsl(hex);
+  return hslToHex((h+35)%360, Math.max(s-5,40), Math.min(l+12,72));
+}
+
+let currentColor = localStorage.getItem(COLOR_KEY) || '#3b5bdb';
+
+function applyColorScheme(hex) {
+  const isDark = document.documentElement.dataset.theme === 'dark';
+  let accent = hex;
+  if (isDark) { const [h,s,l]=hexToHsl(hex); accent=hslToHex(h,s,Math.min(l+28,82)); }
+  const accent2 = getAccent2(accent);
+  document.documentElement.style.setProperty('--accent', accent);
+  document.documentElement.style.setProperty('--accent2', accent2);
+  currentColor = hex;
+  localStorage.setItem(COLOR_KEY, hex);
+  const ci = document.getElementById('accentColorInput');
+  if (ci) ci.value = hex;
+  document.querySelectorAll('.color-swatch').forEach(s => s.classList.toggle('active', s.dataset.color === hex));
+}
+
+const $ = id => document.getElementById(id);
+function applyTheme(theme) {
+  const next = theme === 'dark' ? 'dark' : 'light';
+  document.documentElement.dataset.theme = next;
+  localStorage.setItem(THEME_KEY, next);
+  const label = $('themeLabel');
+  if (label) label.innerText = next === 'dark' ? '夜间' : '日间';
+  applyColorScheme(currentColor);
+}
+applyTheme(localStorage.getItem(THEME_KEY) || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));const fmt = (n, d=2) => isNaN(n) ? '--' : (+n).toFixed(d);
+const fmtMoney = n => isNaN(n) ? '--' : '¥\u2009' + (+n).toLocaleString('zh-CN', {minimumFractionDigits:2, maximumFractionDigits:2});
+const localISO = (d, dt) => new Date(d - d.getTimezoneOffset()*60000).toISOString().slice(0, dt?16:10);
+
+// ── Rate grid ─────────────────────────────────────────────
+const FLAGS = {USD:'🇺🇸',EUR:'🇪🇺',GBP:'🇬🇧',JPY:'🇯🇵',HKD:'🇭🇰',TWD:'🇹🇼',KRW:'🇰🇷',SGD:'🇸🇬',AUD:'🇦🇺',CAD:'🇨🇦'};
+
+function renderRateGrid() {
+  $('rateGrid').innerHTML = Object.keys(FLAGS).map(c => {
+    const r = rates[c]; if (!r) return '';
+    return `<div class="rate-pill">
+      <span class="text-[12px]">${FLAGS[c]}</span>
+      <span class="text-[9px] font-black text-slate-400">${c}</span>
+      <span class="text-[11px] font-extrabold text-slate-700">${r.toFixed(c==='JPY'||c==='KRW'?4:3)}</span>
+    </div>`;
+  }).join('');
+}
+
+// ── Fetch rates ───────────────────────────────────────────
+// 统一汇率解析：提取各币种对 CNY 的汇率
+function parseRates(d) {
+  // 格式A: { rates: { CNY:7.23, EUR:0.92, ... } }  (ER-API / exchangerate-api)
+  if (d?.rates?.CNY) {
+    const u2c = d.rates.CNY;
+    return {
+      USD:u2c, EUR:u2c/d.rates.EUR, GBP:u2c/d.rates.GBP,
+      JPY:u2c/d.rates.JPY, HKD:u2c/d.rates.HKD, KRW:u2c/d.rates.KRW,
+      SGD:u2c/d.rates.SGD, AUD:u2c/d.rates.AUD, CAD:u2c/d.rates.CAD,
+      TWD:d.rates.TWD ? u2c/d.rates.TWD : null
+    };
+  }
+  // 格式B: { usd: { cny:7.23, eur:0.92, ... } }  (fawazahmed0 CDN)
+  if (d?.usd?.cny) {
+    const u2c = d.usd.cny;
+    return {
+      USD:u2c, EUR:u2c/d.usd.eur, GBP:u2c/d.usd.gbp,
+      JPY:u2c/d.usd.jpy, HKD:u2c/d.usd.hkd, KRW:u2c/d.usd.krw,
+      SGD:u2c/d.usd.sgd, AUD:u2c/d.usd.aud, CAD:u2c/d.usd.cad,
+      TWD:d.usd.twd ? u2c/d.usd.twd : null
+    };
+  }
+  // 格式C: { data: { CNY:{value:7.23}, EUR:{value:0.92}, ... } }  (freecurrencyapi)
+  if (d?.data?.CNY?.value) {
+    const u2c = d.data.CNY.value;
+    return {
+      USD:u2c, EUR:u2c/d.data.EUR.value, GBP:u2c/d.data.GBP.value,
+      JPY:u2c/d.data.JPY.value, HKD:u2c/d.data.HKD.value, KRW:u2c/d.data.KRW.value,
+      SGD:u2c/d.data.SGD.value, AUD:u2c/d.data.AUD.value, CAD:u2c/d.data.CAD.value,
+      TWD:d.data.TWD?.value ? u2c/d.data.TWD.value : null
+    };
+  }
+  return null;
+}
+
+function applyRates(parsed, name) {
+  if (!parsed) return false;
+  Object.entries(parsed).forEach(([k,v]) => { if (v && isFinite(v)) rates[k] = v; });
+  const badge = $('rateStatus'), lbl = $('apiSourceLabel');
+  badge.style.cssText = 'font-size:9px;padding:2px 8px;border-radius:99px;font-weight:700;border:1px solid;background:rgba(14,168,106,.1);color:var(--success);border-color:rgba(14,168,106,.3)';
+  badge.innerHTML = '<i class="fas fa-check mr-1"></i>实时更新';
+  badge.classList.remove('hidden');
+  lbl.innerText = name;
+  renderRateGrid(); calculate();
+  return true;
+}
+
+async function fetchLiveRates() {
+  // 内置 API 列表（优先中国节点可访问的 CDN）
+  const APIS = [
+    // ① jsDelivr CDN — fawazahmed0 项目，含中国 CDN 节点，速度最快
+    { url:'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json', name:'JSDELIVR·CDN' },
+    // ② Cloudflare Pages — fawazahmed0 官方备用端点
+    { url:'https://latest.currency-api.pages.dev/v1/currencies/usd.json', name:'CF·PAGES' },
+    // ③ ExchangeRate-API — 免费无 key，国内可访问
+    { url:'https://open.er-api.com/v6/latest/USD', name:'ER-API' },
+  ];
+
+  const badge = $('rateStatus'), lbl = $('apiSourceLabel');
+  for (const api of APIS) {
+    try {
+      const d = await fetch(api.url, { signal: AbortSignal.timeout(5000) }).then(r => r.ok ? r.json() : null);
+      if (!d) continue;
+      if (applyRates(parseRates(d), api.name)) return;
+    } catch(e) {}
+  }
+
+  badge.innerHTML = '<i class="fas fa-exclamation-triangle mr-1"></i>预设汇率';
+  badge.style.cssText = 'font-size:9px;padding:2px 8px;border-radius:99px;font-weight:700;border:1px solid;background:rgba(233,146,10,.1);color:var(--warn);border-color:rgba(233,146,10,.3)';
+  badge.classList.remove('hidden'); lbl.innerText = 'OFFLINE';
+  renderRateGrid(); calculate();
+}
+
+// ── Counts ────────────────────────────────────────────────
+async function updateCounts(act=false) {
+  const key = localISO(new Date(),false).replace(/-/g,''), ts = Date.now();
+  try {
+    let [d,t] = await Promise.all([
+      fetch(`${API_BASE}/dailyCalc/${key}.json?_=${ts}`).then(r=>r.json()),
+      fetch(`${API_BASE}/calcCount.json?_=${ts}`).then(r=>r.json())
+    ]);
+    d=parseInt(d)||0; t=parseInt(t)||0;
+    if (act) {
+      d++; t++;
+      await Promise.all([
+        fetch(`${API_BASE}/dailyCalc/${key}.json`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)}),
+        fetch(`${API_BASE}/calcCount.json`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(t)})
+      ]);
+    }
+    $('todayCount').innerText=d; $('totalCount').innerText=t;
+  } catch(e){}
+}
+
+// ── Toggle helpers ────────────────────────────────────────
+function syncToggle(trackId, on) {
+  $(trackId).classList.toggle('on', on);
+}
+function syncPushUI(on) {
+  syncToggle('pushTrack', on);
+  $('pushSettings').classList.toggle('hidden', !on);
+  $('pushOffHint').classList.toggle('hidden', on);
+}
+function syncMiddlemanUI(on) {
+  syncToggle('middlemanTrack', on);
+  $('middlemanSettings').classList.toggle('hidden', !on);
+  $('middlemanOffHint').classList.toggle('hidden', on);
+  if (on) {
+    // 重置为无选择状态，避免直接计入费用
+    midMode = 'none';
+    $('modeRateBtn').classList.remove('active');
+    $('modeManualBtn').classList.remove('active');
+    $('panelRate').classList.add('hidden');
+    $('panelManual').classList.add('hidden');
+    $('midModeHint').classList.remove('hidden');
+    $('middlemanLeftHint').classList.add('hidden');
+  } else {
+    midMode = 'none';
+  }
+}
+function syncCustomRateUI(on) {
+  syncToggle('customRateTrack', on);
+  $('customRateWrapper').classList.toggle('hidden', !on);
+}
+
+function setMidMode(mode) {
+  midMode = mode;
+  $('modeRateBtn').classList.toggle('active', mode==='rate');
+  $('modeManualBtn').classList.toggle('active', mode==='manual');
+  $('panelRate').classList.toggle('hidden', mode!=='rate');
+  $('panelManual').classList.toggle('hidden', mode!=='manual');
+  $('midModeHint').classList.toggle('hidden', mode!=='none');
+  if (mode==='rate') $('middlemanManual').value = '';
+  calculate();
+}
+
+// ── Slider sync ───────────────────────────────────────────
+function syncSlider() {
+  const v = parseFloat($('middlemanRateInput').value)||5;
+  const sv = Math.min(20, Math.max(1, v));
+  $('middlemanRate').value = sv;
+  const pct = (sv-1)/19*100;
+  $('middlemanRate').style.background = `linear-gradient(to right,var(--accent) ${pct}%,var(--border) ${pct}%)`;
+}
+
+// ── Calculate ─────────────────────────────────────────────
+function calculate() {
+  const curr = $('currencySelector').value;
+  $('customRateCurr').innerText = curr;
+  const useCustom = $('useCustomRate').checked;
+  $('customRateToggleBox').style.visibility = curr==='CNY' ? 'hidden' : 'visible';
+  if (curr==='CNY') { $('useCustomRate').checked=false; syncCustomRateUI(false); }
+
+  const amount = parseFloat($('renewalAmount').value);
+  const trade  = new Date($('tradeDate').value);
+  const expiry = new Date($('expiryDate').value);
+  const days   = (expiry - trade) / 86400000;
+
+  // Persist to localStorage
+  localStorage.setItem('vps_cfg', JSON.stringify({
+    amount: isNaN(amount)?'':amount, curr, cycleDays,
+    useCustom, customRate: $('customRateInput').value,
+    premium: $('premiumInput').value,
+    usePush: $('usePush').checked, pushFee: $('pushFee').value,
+    pushCurr: $('pushCurrLabel').innerText, pushPayer: $('pushPayer').value,
+    useMiddleman: $('useMiddleman').checked, middlemanPayer: $('middlemanPayer').value,
+    midMode, midRate: $('middlemanRateInput').value, midManual: $('middlemanManual').value
+  }));
+
+  if (isNaN(amount) || days <= 0) return resetResults(days);
+
+  let rate = rates[curr] || 1;
+  if (useCustom) rate = parseFloat($('customRateInput').value) || rate;
+
+  const resOrig = (amount / cycleDays) * days;
+  const resCNY  = resOrig * rate;
+
+  // Push 费分摊
+  const usePush   = $('usePush').checked;
+  const pushAmt   = usePush ? (parseFloat($('pushFee').value)||0) * (rates[$('pushCurrLabel').innerText]||1) : 0;
+  const pushPayer = $('pushPayer').value;
+  // bPush = 买家实际承担的 push（计入总支出）
+  // sPush = 卖家承担的 push（卖家自己消化，买家不加钱）
+  const bPush = !usePush ? 0 : pushPayer==='buyer' ? pushAmt : pushAmt/2; // buyer 或 split
+
+  // actPaid = 实付卖家 = 剩余价值 + 溢价 + 买家承担的 Push
+  // （卖家承担的 Push 由卖家自己付，不加进买家支出）
+  const premStr   = $('premiumInput').value;
+  const prem      = premStr === '' ? 0 : parseFloat(premStr);
+  const premFilled = premStr !== '' && !isNaN(prem);
+  let actPaid = resCNY + (isNaN(prem) ? 0 : prem) + bPush;
+
+  if (isNaN(parseFloat(premStr)) && premStr !== '') {
+    actPaid = NaN;
+    $('bindHint').innerHTML = `<i class="fas fa-exclamation-circle mr-1 text-red-400"></i>溢价输入无效`;
+  } else if (!premFilled) {
+    const pushPart = bPush > 0 ? ` + Push ${fmtMoney(bPush)}` : '';
+    $('bindHint').innerHTML = `<i class="fas fa-info-circle mr-1 text-indigo-300"></i>未填溢价，按原价计算${pushPart} · 实付 = <strong>${fmtMoney(actPaid)}</strong>`;
+  } else {
+    const pushPart = bPush > 0 ? ` + Push ${fmtMoney(bPush)}` : '';
+    $('bindHint').innerHTML = `<i class="fas fa-check-circle mr-1 text-indigo-400"></i>` +
+      `${fmtMoney(resCNY)} ${prem>=0?'+':''}${fmtMoney(prem)}${pushPart} = <strong>${fmtMoney(actPaid)}</strong>`;
+  }
+
+  // Middleman
+  let midFee = 0, bMid = 0, sMid = 0;
+  const isMiddleman    = $('useMiddleman').checked;
+  const middlemanPayer = $('middlemanPayer').value;
+  const hint           = $('middlemanLeftHint');
+
+  if (isMiddleman && midMode !== 'none' && !isNaN(actPaid) && actPaid > 0) {
+    const rateVal   = (parseFloat($('middlemanRateInput').value)||5) / 100;
+    const manualVal = parseFloat($('middlemanManual').value);
+    if (midMode === 'manual') {
+      midFee = manualVal > 0 ? manualVal : 0;
+      if (midFee > 0) {
+        hint.innerHTML = `<i class="fas fa-pen mr-1"></i>手动指定 ${fmtMoney(midFee)}`;
+        hint.classList.remove('hidden');
+      } else {
+        hint.classList.add('hidden');
+      }
+    } else {
+      midFee = actPaid * rateVal;
+      hint.innerHTML = `<i class="fas fa-calculator mr-1"></i>${fmtMoney(actPaid)} \xd7 ${(rateVal*100).toFixed(1)}% = ${fmtMoney(midFee)}`;
+      hint.classList.remove('hidden');
+    }
+
+    if (middlemanPayer==='buyer') { bMid=midFee; sMid=0; }
+    else { bMid=midFee/2; sMid=midFee/2; } // split AA
+
+    $('payerDesc').innerText = middlemanPayer==='buyer'
+      ? '买家额外支付担保费，已计入总支出'
+      : '各付一半，买家半额已计入总支出';
+
+    // right-side "担保费明细" block removed; keep fee math only.
+  } else {
+    hint.classList.add('hidden');
+  }
+
+  // 买家总支出 = 实付卖家（含 bPush）+ 中介费（买家承担部分）
+  const total = actPaid + bMid;
+
+  // ── Right panel updates ──
+  $('resCNYBig').innerText   = fmtMoney(resCNY);
+  $('resOrig').innerText     = `${fmt(resOrig)} ${curr}`;
+
+  const pct = Math.min((days/cycleDays)*100, 100);
+  $('remainingDays').innerText  = `${fmt(days, isDateTime?2:0)} 天`;
+  $('remainingBar').style.width = `${pct}%`;
+  $('progressHint').innerText   = `剩余 ${pct.toFixed(1)}% 周期`;
+  $('dayOfficial').innerText    = `${fmtMoney(resCNY/days).replace('¥\u2009','¥')} / 天`;
+
+  if (!isNaN(actPaid)) {
+    $('resActual').innerText = fmtMoney(actPaid);
+
+    // Push 行：买家承担时展示，卖家承担时隐藏
+    $('pushRow').classList.toggle('hidden', bPush <= 0);
+    $('resPush').innerText = bPush > 0 ? '+' + fmtMoney(bPush) : '--';
+
+    // Middleman 行
+    $('middlemanRow').classList.toggle('hidden', bMid <= 0);
+    $('resMiddleman').innerText = bMid > 0 ? '+' + fmtMoney(bMid) : '--';
+
+    // Premium badge
+    if (premFilled) {
+      $('premiumBox').classList.remove('hidden');
+      const isDiscount = prem < 0;
+      const badgeColor = isDiscount ? 'text-emerald-400 border-emerald-400/40 bg-emerald-400/10' : 'text-amber-400 border-amber-400/40 bg-amber-400/10';
+      $('premiumBadge').className = `text-[10px] font-black px-2 py-0.5 rounded-full border ${badgeColor}`;
+      $('premiumBadge').innerText = isDiscount ? '折价' : '溢价';
+      $('premiumValueBig').style.color = isDiscount ? '#34d399' : '#fbbf24';
+      $('premiumValueBig').innerText = `${prem>=0?'+':''}${fmtMoney(prem)}`;
+    } else {
+      $('premiumBox').classList.add('hidden');
+    }
+
+    $('dayActual').innerText = `${fmtMoney(total/days).replace('¥\u2009','¥')} / 天`;
+
+    // Total cost box
+    const hasPremiumExtra = premFilled && prem !== 0;
+    const hasExtra = bPush + bMid > 0 || hasPremiumExtra;
+    const parts = [];
+    if (hasPremiumExtra) parts.push(`${prem > 0 ? '溢价' : '折价'} ${prem > 0 ? '+' : ''}${fmtMoney(prem)}`);
+    if (bPush > 0) parts.push(`Push +${fmtMoney(bPush)}`);
+    if (bMid  > 0) parts.push(`中介 +${fmtMoney(bMid)}`);
+    $('extraFeeDetail').innerText = parts.join('  ·  ');
+    $('finalTotalCostDisplay').innerText = fmtMoney(total);
+    $('finalCostBox').className = hasExtra ? 'cost-extra' : 'cost-normal';
+    $('finalTotalCostDisplay').style.color = hasExtra ? '#a5b4fc' : '#fff';
+
+    // 费用构成条：剩余价值 | 溢价 | Push(买家) | 中介(买家)
+    $('valueRatioBox').classList.remove('hidden');
+    const base = resCNY;
+    const premPos = Math.max(0, prem || 0);
+    const totalBar = base + premPos + bPush + bMid || 1;
+    $('barValue').style.width   = `${base    / totalBar * 100}%`;
+    $('barPremium').style.width = `${premPos / totalBar * 100}%`;
+    $('barPush').style.width    = `${bPush   / totalBar * 100}%`;
+    $('barMid').style.width     = `${bMid    / totalBar * 100}%`;
+    $('legendPremium').classList.toggle('hidden', premPos <= 0);
+    $('legendPush').classList.toggle('hidden',    bPush  <= 0);
+    $('legendMid').classList.toggle('hidden',     bMid   <= 0);
+  } else {
+    resetPartial();
+  }
+}
+
+function resetResults(days) {
+  if (!isNaN(days) && days!==0) {
+    const pct = Math.min(Math.abs(days/cycleDays)*100, 100);
+    $('remainingDays').innerText  = `${fmt(Math.abs(days), isDateTime?2:0)} 天`;
+    $('remainingBar').style.width = `${pct}%`;
+    $('progressHint').innerText   = days<0 ? '⚠ 已过期' : `剩余 ${pct.toFixed(1)}% 周期`;
+    $('remainingDays').style.color = days<0 ? '#f87171' : '#06b6d4';
+  }
+  resetPartial();
+}
+function resetPartial() {
+  ['resCNYBig','resOrig','resActual','dayOfficial','dayActual'].forEach(id => $(id).innerText='--');
+  $('finalTotalCostDisplay').innerText='¥ --'; $('finalTotalCostDisplay').style.color='#fff';
+  $('premiumBox').classList.add('hidden');
+  $('pushRow').classList.add('hidden');
+  $('middlemanRow').classList.add('hidden');
+  $('valueRatioBox').classList.add('hidden');
+  $('middlemanLeftHint').classList.add('hidden');
+  $('extraFeeDetail').innerText='';
+  $('finalCostBox').className = 'cost-normal';
+}
+
+// ── Init ──────────────────────────────────────────────────
+window.onload = () => {
+  $('themeToggle').onclick = () => applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
+
+  // ── Color picker setup ────────────────────────────────────
+  const popup = $('colorPickerPopup');
+  // Label
+  const lbl = document.createElement('span');
+  lbl.className = 'cp-label'; lbl.textContent = '主题色';
+  popup.appendChild(lbl);
+  // Free color input
+  const wrap = document.createElement('div');
+  wrap.className = 'cp-input-wrap';
+  const ci = document.createElement('input');
+  ci.type = 'color'; ci.id = 'accentColorInput'; ci.value = currentColor;
+  ci.oninput = () => applyColorScheme(ci.value);
+  wrap.appendChild(ci); popup.appendChild(wrap);
+  // Preset row label
+  const lbl2 = document.createElement('span');
+  lbl2.className = 'cp-label'; lbl2.textContent = '快捷预设';
+  popup.appendChild(lbl2);
+  // Preset swatches
+  const presetRow = document.createElement('div');
+  presetRow.className = 'cp-presets';
+  COLOR_PRESETS.forEach(hex => {
+    const s = document.createElement('div');
+    s.className = 'color-swatch' + (hex === currentColor ? ' active' : '');
+    s.dataset.color = hex; s.style.background = hex; s.title = hex;
+    s.onclick = e => { e.stopPropagation(); applyColorScheme(hex); };
+    presetRow.appendChild(s);
+  });
+  popup.appendChild(presetRow);
+
+  $('colorToggle').onclick = e => { e.stopPropagation(); popup.classList.toggle('open'); };
+  document.addEventListener('click', () => popup.classList.remove('open'));
+  renderRateGrid();
+  fetchLiveRates();
+  updateCounts();
+
+  const p = new URLSearchParams(location.search);
+  const today = new Date();
+
+  if ([...p.keys()].length > 0) {
+    if (pg(p,'isDateTime')) {
+      isDateTime = true;
+      $('tradeDate').type = $('expiryDate').type = 'datetime-local';
+      $('toggleTimePrecision').classList.add('text-indigo-500');
+    }
+    ['renewalAmount','currencySelector','tradeDate','expiryDate','premiumInput','pushFee','pushPayer','middlemanPayer']
+      .forEach(id => { const v=pg(p,id); if(v) $(id).value=v; });
+    const pc=pg(p,'pushCurrency'); if(pc) $('pushCurrLabel').innerText=pc;
+    const cd=pg(p,'cycleDays');    if(cd) cycleDays=parseInt(cd);
+    if (pg(p,'useCustomRate')==='1') { $('useCustomRate').checked=true; syncCustomRateUI(true); const cv=pg(p,'customRateInput'); if(cv) $('customRateInput').value=cv; }
+    if (pg(p,'usePush')==='1')       { $('usePush').checked=true; syncPushUI(true); }
+    if (pg(p,'useMiddleman')==='1')  { $('useMiddleman').checked=true; syncMiddlemanUI(true); }
+  } else {
+    const mem = JSON.parse(localStorage.getItem('vps_cfg'));
+    if (mem) {
+      if (mem.amount!==undefined) $('renewalAmount').value = mem.amount;
+      $('currencySelector').value = mem.curr||'USD';
+      cycleDays = mem.cycleDays||365;
+      if (mem.useCustom) { $('useCustomRate').checked=true; syncCustomRateUI(true); $('customRateInput').value=mem.customRate||''; }
+      if (mem.premium!==undefined) $('premiumInput').value = mem.premium;
+      if (mem.usePush) {
+        $('usePush').checked=true; syncPushUI(true);
+        $('pushFee').value = mem.pushFee||'';
+        $('pushCurrLabel').innerText = mem.pushCurr||'USD';
+        const pp = (mem.pushPayer==='seller') ? 'buyer' : (mem.pushPayer||'buyer');
+        $('pushPayer').value=pp; document.querySelectorAll('[data-push-payer]').forEach(b=>b.classList.toggle('on',b.dataset.pushPayer===pp));
+      }
+      if (mem.useMiddleman) {
+        $('useMiddleman').checked=true; syncMiddlemanUI(true);
+        const mp = (mem.middlemanPayer==='seller') ? 'buyer' : (mem.middlemanPayer||'buyer');
+        $('middlemanPayer').value=mp; document.querySelectorAll('[data-payer]').forEach(b=>b.classList.toggle('on',b.dataset.payer===mp));
+        if (mem.midMode) setMidMode(mem.midMode);
+        if (mem.midRate) $('middlemanRateInput').value=mem.midRate;
+        if (mem.midManual) $('middlemanManual').value=mem.midManual;
+        syncSlider();
+      }
+    }
+    $('tradeDate').value  = localISO(today, false);
+    const exp = new Date(today); exp.setDate(exp.getDate()+cycleDays);
+    $('expiryDate').value = localISO(exp, false);
+  }
+
+  document.querySelectorAll('.cyc-btn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.cycle)===cycleDays));
+
+  // Populate push currency dropdown
+  const dd = $('pushCurrDd');
+  Object.keys(rates).filter(c=>c!=='CNY').forEach(c => {
+    const o = document.createElement('div');
+    o.className='csel-opt'; o.innerText=c;
+    o.onclick=()=>{ $('pushCurrLabel').innerText=c; dd.classList.remove('open'); calculate(); };
+    dd.appendChild(o);
+  });
+};
+
+// ── Events ────────────────────────────────────────────────
+$('useCustomRate').onchange = () => { syncCustomRateUI($('useCustomRate').checked); calculate(); };
+$('usePush').onchange       = () => { syncPushUI($('usePush').checked); calculate(); };
+$('useMiddleman').onchange  = () => { syncMiddlemanUI($('useMiddleman').checked); calculate(); };
+
+$('pushCurrBtn').onclick = e => { e.stopPropagation(); $('pushCurrDd').classList.toggle('open'); };
+document.onclick = () => $('pushCurrDd').classList.remove('open');
+
+document.querySelectorAll('[data-push-payer]').forEach(btn => btn.onclick = () => {
+  document.querySelectorAll('[data-push-payer]').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on'); $('pushPayer').value=btn.dataset.pushPayer; calculate();
+});
+document.querySelectorAll('[data-payer]').forEach(btn => btn.onclick = () => {
+  document.querySelectorAll('[data-payer]').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on'); $('middlemanPayer').value=btn.dataset.payer; calculate();
+});
+
+$('middlemanRate').oninput      = () => { $('middlemanRateInput').value=$('middlemanRate').value; syncSlider(); calculate(); };
+$('middlemanRateInput').oninput = () => { syncSlider(); calculate(); };
+
+['renewalAmount','currencySelector','tradeDate','expiryDate','premiumInput','pushFee','customRateInput','middlemanManual']
+  .forEach(id => { $(id).oninput=$(id).onchange=calculate; });
+
+document.querySelectorAll('.cyc-btn').forEach(btn => btn.onclick = () => {
+  document.querySelector('.cyc-btn.active').classList.remove('active');
+  btn.classList.add('active');
+  cycleDays = parseInt(btn.dataset.cycle);
+  const d = new Date($('tradeDate').value);
+  d.setDate(d.getDate()+cycleDays);
+  $('expiryDate').value = localISO(d, isDateTime);
+  calculate();
+});
+
+$('toggleTimePrecision').onclick = () => {
+  isDateTime = !isDateTime;
+  $('toggleTimePrecision').classList.toggle('text-indigo-500', isDateTime);
+  const tv=$('tradeDate').value, ev=$('expiryDate').value;
+  $('tradeDate').type=$('expiryDate').type = isDateTime?'datetime-local':'date';
+  if (isDateTime) {
+    if (tv.length===10) $('tradeDate').value=tv+'T00:00';
+    if (ev.length===10) $('expiryDate').value=ev+'T00:00';
+  } else {
+    if (tv.length>10) $('tradeDate').value=tv.slice(0,10);
+    if (ev.length>10) $('expiryDate').value=ev.slice(0,10);
+  }
+  calculate();
+};
+
+// ── Copy ──────────────────────────────────────────────────
+$('copyBtn').onclick = () => {
+  const bPushTxt = $('pushRow').classList.contains('hidden') ? '' : `\n  ⚡ Push 费（买家）  ${$('resPush').innerText}`;
+  const bMidTxt  = $('middlemanRow').classList.contains('hidden') ? '' : `\n  🛡 中介费（买家）  ${$('resMiddleman').innerText}`;
+  const premTxt  = $('premiumBox').classList.contains('hidden') ? '' : `\n  ${$('premiumBadge').innerText==='折价'?'💚 卖家折价':'🔶 卖家溢价'}       ${$('premiumValueBig').innerText}`;
+  const txt =
+`━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  📊 VPS 剩余价值报告
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  💰 剩余价值       ${$('resCNYBig').innerText}${premTxt}
+  📅 剩余有效期     ${$('remainingDays').innerText}
+  💵 实付卖家       ${$('resActual').innerText}${bPushTxt}${bMidTxt}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  📈 综合日均       ${$('dayActual').innerText}
+  💳 买家总支出     ${$('finalTotalCostDisplay').innerText}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+`;
+  navigator.clipboard.writeText(txt);
+  showToast('详情已复制 ✓');
+  updateCounts(true);
+};
+
+// ── Share ─────────────────────────────────────────────────
+$('shareBtn').onclick = () => {
+  const p = new URLSearchParams();
+  const sk = (long, val) => { if (val !== '' && val != null) p.set(RKEY[long], val); };
+  sk('renewalAmount',  $('renewalAmount').value);
+  sk('currencySelector', $('currencySelector').value);
+  sk('tradeDate',      $('tradeDate').value);
+  sk('expiryDate',     $('expiryDate').value);
+  sk('premiumInput',   $('premiumInput').value);
+  sk('pushFee',        $('pushFee').value);
+  sk('pushPayer',      $('pushPayer').value);
+  sk('middlemanPayer', $('middlemanPayer').value);
+  p.set(RKEY['cycleDays'],    cycleDays);
+  p.set(RKEY['pushCurrency'], $('pushCurrLabel').innerText);
+  if (isDateTime) p.set(RKEY['isDateTime'], '1');
+  if ($('useCustomRate').checked) { p.set(RKEY['useCustomRate'],'1'); const cv=$('customRateInput').value; if(cv) p.set(RKEY['customRateInput'],cv); }
+  if ($('usePush').checked)       p.set(RKEY['usePush'],'1');
+  if ($('useMiddleman').checked)  p.set(RKEY['useMiddleman'],'1');
+  navigator.clipboard.writeText(location.origin+location.pathname+'?'+p);
+  showToast('分享链接已复制 ✓');
+  updateCounts(true);
+};
+
+$('resetBtn').onclick = () => { localStorage.removeItem('vps_cfg'); location.href=location.origin+location.pathname; };
+
+// ── 生成图片 ──────────────────────────────────────────────
+$('snapBtn').onclick = async () => {
+  const el = $('snapTarget');
+  const bg = getComputedStyle(el).backgroundColor || '#0f1729';
+  $('snapBtn').disabled = true;
+  showToast('正在生成图片…');
+  try {
+    await document.fonts.ready;
+    if (!window.htmlToImage || typeof window.htmlToImage.toPng !== 'function') throw new Error('html-to-image unavailable');
+    const dataUrl = await window.htmlToImage.toPng(el, {
+      cacheBust: true,
+      backgroundColor: bg,
+      pixelRatio: Math.max(2, window.devicePixelRatio || 1),
+      skipAutoScale: true
+    });
+    const link = document.createElement('a');
+    link.download = 'vps-report-' + new Date().toISOString().slice(0,10) + '.png';
+    link.href = dataUrl;
+    link.click();
+    showToast('图片已保存 ✅');
+  } catch (e) {
+    showToast('生成失败，请重试');
+  } finally {
+    $('snapBtn').disabled = false;
+  }
+};
+function showToast(m) {
+  clearTimeout(toastTimer);
+  const t=$('toast');
+  $('toastMsg').innerText=m;
+  t.classList.remove('hidden'); t.classList.add('t-show');
+  toastTimer = setTimeout(()=>{ t.classList.remove('t-show'); t.classList.add('hidden'); }, 2200);
+}
+</script>
+</body>
+</html>
