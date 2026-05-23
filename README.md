@@ -6,8 +6,6 @@
 
 本项目基于 [coco20652-netizen/vps-calculator](https://github.com/coco20652-netizen/vps-calculator) 进行优化修改。
 
-[在线使用](#在线使用) • [功能特性](#功能特性) • [快速开始](#快速开始) • [常见问题](#常见问题)
-
 </div>
 
 ## 📋 简介
